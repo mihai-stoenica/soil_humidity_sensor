@@ -3,6 +3,7 @@
 #include "socket_utils.h"
 #include "wifi_utils.h"
 #include "command_utils.h"
+#include "humidity_utils.h"
 
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
@@ -11,7 +12,7 @@ const String origin = ORIGIN;
 const String ws_url = WS_URL;
 
 unsigned long lastSend = 0;
-const unsigned long interval = 10000;
+const unsigned long sample_interval = 2000;
 
 void setup() {
   Serial.begin(115200);
@@ -28,11 +29,10 @@ void loop() {
   if (!stompConnected) return;
 
   unsigned long now = millis();
-  if (now - lastSend >= interval) {
+  if (now - lastSend >= sample_interval) {
     lastSend = now;
-    String payload = "{ \"humidity\": " + String(humidity) + " }";
-    sendMessageStomp(payload);
-    humidity++;
+
+    tryUpdateHumidity();
   }
   commandLoop(); 
 }

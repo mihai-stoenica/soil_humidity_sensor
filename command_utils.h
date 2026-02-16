@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-#define PIN_PUMP 2
+#define PIN_PUMP 33
 
 void handleCommand(const String& json);
 void commandLoop();
