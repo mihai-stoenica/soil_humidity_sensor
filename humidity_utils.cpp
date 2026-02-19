@@ -1,12 +1,19 @@
 #include "humidity_utils.h"
+#include "http_utils.h"
 
 const int dryValue = 4000;
-const int wetValue = 900;
+const int wetValue = 1000;
 
 static float smoothedHumidity = -1;   
+
 static int lastSentHumidity = -1;
+static float lastSentTemp = -100.0;
+
+bool firstRun = true;
 
 const float ALPHA = 0.2;                
+
+DHT dht(DHTPIN, DHTTYPE);
 
 int takeSample() {
   int rawValue = analogRead(SENSOR_PIN);
@@ -34,32 +41,54 @@ int getSmoothedHumidity() {
   return round(smoothedHumidity);
 }
 
-bool shouldSend(int value) {
-  if (lastSentHumidity < 0) {
-    lastSentHumidity = value;
+bool shouldSend(int humidity, float temp) {
+  if (firstRun) {
+    lastSentHumidity = humidity;
+    lastSentTemp = temp;
+    firstRun = false;
     return true;
   }
 
-  if (value != lastSentHumidity) {
-    lastSentHumidity = value;
+
+  bool humidityChanged = (humidity != lastSentHumidity);
+  bool tempChanged = (fabs(lastSentTemp - temp) >= 0.5);
+
+  if (humidityChanged || tempChanged) {
+    lastSentHumidity = humidity;
+    lastSentTemp = temp;
     return true;
   }
 
   return false;
 }
 
-void sendHumidity(int humidity) {
+void sendHumidityAndTemp(int humidity, float temp) {
   if(humidity > 100 || humidity < 0) return;
 
-  String payload = "{ \"humidity\": " + String(humidity) + " }";
+  String payload = 
+    "{ \"humidity\": " + String(humidity) + 
+    ", \"temperature\": " + String(temp) + 
+    " }";
   sendMessageStomp(payload);
 }
 
 void tryUpdateHumidity() {
   int humidity = getSmoothedHumidity();
+  float temperature = dht.readTemperature();
 
-  if(shouldSend(humidity)) {
-    sendHumidity(humidity);
-    Serial.printf("📡 Sent humidity: %d%%\n", humidity);
+  if (isnan(temperature)) return;
+
+  if(shouldSend(humidity, temperature)) {
+    sendHumidityAndTemp(humidity, temperature);
+    Serial.printf("📡 Sent soil: %d%% | Temp: %.1f°C\n",
+                  humidity, temperature);
   }
+}
+
+void sendRecord() {
+  int humidity = takeSample();
+
+  String json = "{\"value\":" + String(humidity) + "}";
+
+  POST("/humidity/save", json);
 }

@@ -11,28 +11,38 @@ const String apiKey = DEVICE_API_KEY;
 const String origin = ORIGIN;
 const String ws_url = WS_URL;
 
-unsigned long lastSend = 0;
-const unsigned long sample_interval = 2000;
+unsigned long lastSentSample = 0;
+const unsigned long sampleInterval = 2000;
+
+unsigned long lastSentRecord = 0;
+const unsigned recordInterval = 3600000;
 
 void setup() {
   Serial.begin(115200);
 
   initWifi(ssid, password);
   initWebSocket(apiKey, origin, ws_url);
+
+  sendRecord();
+  lastSentRecord = millis();
 }
 
 int humidity = 32;
 
 void loop() {
   client.poll();
-  
+  dht.begin();
   if (!stompConnected) return;
 
   unsigned long now = millis();
-  if (now - lastSend >= sample_interval) {
-    lastSend = now;
-
+  if (now - lastSentSample >= sampleInterval) {
+    lastSentSample = now;
     tryUpdateHumidity();
+  }
+
+  if(now - lastSentRecord >= recordInterval) {
+    lastSentRecord = now;
+    sendRecord();
   }
   commandLoop(); 
 }
