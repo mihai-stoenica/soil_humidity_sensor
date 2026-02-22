@@ -11,6 +11,8 @@ const String apiKey = DEVICE_API_KEY;
 const String origin = ORIGIN;
 const String ws_url = WS_URL;
 
+unsigned long lastHeartbeat = 0;
+
 unsigned long lastSentSample = 0;
 const unsigned long sampleInterval = 2000;
 
@@ -30,7 +32,13 @@ void setup() {
 int humidity = 32;
 
 void loop() {
-  client.poll();
+  client.poll(); // Handle WS tasks
+
+  if (millis() - lastHeartbeat > 7000) { // Send slightly faster than 10s to be safe
+    client.send("\n"); 
+    lastHeartbeat = millis();
+  }
+  /*client.poll();
   dht.begin();
   if (!stompConnected) return;
 
@@ -44,5 +52,5 @@ void loop() {
     lastSentRecord = now;
     sendRecord();
   }
-  commandLoop(); 
+  commandLoop(); */
 }

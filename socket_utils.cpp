@@ -20,6 +20,10 @@ void sendStomp(String frame) {
   char* buf = new char[len + 1];
   memcpy(buf, frame.c_str(), len);
   buf[len] = '\0';
+
+  String apiKey = DEVICE_API_KEY;
+
+  client.addHeader("X-API-KEY", apiKey);
   client.send(buf, len + 1);
   delete[] buf;
 }
@@ -31,6 +35,8 @@ void connectStomp() {
     "CONNECT\n"
     "accept-version:1.2\n"
     "host:esp32\n"
+    "X-API-KEY:" DEVICE_API_KEY "\n"
+    "heart-beat:10000,10000\n"
     "\n"
   );
 }
@@ -40,6 +46,7 @@ void subscribeStomp() {
       "SUBSCRIBE\n"
       "id:sub-0\n"
       "destination:/topic/user/" DEVICE_API_KEY "\n"
+      "X-API-KEY:" DEVICE_API_KEY "\n"
       "\n"
     );
 }
@@ -48,6 +55,7 @@ void sendMessageStomp(const String& body) {
   sendStomp(
       "SEND\n"
       "destination:/app/device\n"
+      "X-API-KEY:" DEVICE_API_KEY "\n"
       "\n" + 
       body
     );
