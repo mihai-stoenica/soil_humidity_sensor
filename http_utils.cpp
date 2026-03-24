@@ -11,6 +11,7 @@ void POST(const char* path, const String& jsonBody) {
 
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-API-KEY", DEVICE_API_KEY);
+  http.addHeader("X-SECRET", DEVICE_SECRET);
 
   int httpResponseCode = http.POST(jsonBody);
 

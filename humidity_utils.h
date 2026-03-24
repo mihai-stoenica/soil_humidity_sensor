@@ -6,7 +6,7 @@
 #define DHTTYPE DHT11   
 
 #include <Arduino.h>
-#include "socket_utils.h"
+//#include "socket_utils.h"
 #include <DHT.h>
 
 extern DHT dht;

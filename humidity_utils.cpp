@@ -1,8 +1,9 @@
 #include "humidity_utils.h"
 #include "http_utils.h"
+#include "mqtt_utils.h"
 
 const int dryValue = 4000;
-const int wetValue = 1000;
+const int wetValue = 0;
 
 static float smoothedHumidity = -1;   
 
@@ -69,7 +70,8 @@ void sendHumidityAndTemp(int humidity, float temp) {
     "{ \"humidity\": " + String(humidity) + 
     ", \"temperature\": " + String(temp) + 
     " }";
-  sendMessageStomp(payload);
+
+  sendMessage(payload);
 }
 
 void tryUpdateHumidity() {
