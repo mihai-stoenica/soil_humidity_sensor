@@ -8,7 +8,7 @@ extern WiFiClient espClient;
 extern PubSubClient client;
 
 void initMqtt();
-void reconnect();
+bool reconnect();
 void sendMessage(String& payload);
 
 #endif

@@ -3,6 +3,10 @@
 
 #include <WiFi.h>
 
-void initWifi(const char* ssid, const char* password);
+extern WiFiClient espClient;
+extern bool bleActive;
 
-#endif
+void initWifi();
+void handleWifiLoop();
+
+#endif 

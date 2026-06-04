@@ -33,8 +33,8 @@ static void executeCommand(int command, int duration) {
   activeCmd.active = true;
   activeCmd.isWatering = true; 
 
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH);
+  
+  digitalWrite(pin, LOW);
 
   activeCmd.endTime = millis() + (duration * 1000UL);
   Serial.printf("START CONTINUOUS: Pin %d ON for %d s\n", pin, duration);
@@ -52,7 +52,7 @@ static void executeCommand(int command, int duration, int steps, int delay) {
   activeCmd.isWatering = true; 
 
   pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH); 
+  digitalWrite(pin, LOW); 
     
   activeCmd.endTime = millis() + (duration * 1000UL);
   Serial.printf("START STEP: Pin %d ON for %d s. Steps: %d\n", pin, duration, steps);
@@ -90,7 +90,7 @@ void commandLoop() {
     if (millis() >= activeCmd.endTime) {
         
         if (activeCmd.isWatering) {
-            digitalWrite(activeCmd.pin, LOW); 
+            digitalWrite(activeCmd.pin, HIGH); 
             activeCmd.stepsLeft--; 
 
             if (activeCmd.stepsLeft > 0) {
@@ -103,7 +103,7 @@ void commandLoop() {
             }
 
         } else {
-            digitalWrite(activeCmd.pin, HIGH); 
+            digitalWrite(activeCmd.pin, LOW); 
             activeCmd.isWatering = true; 
             activeCmd.endTime = millis() + (activeCmd.durationSec * 1000UL);
             Serial.printf("STEP: Pin %d ON for %d s. Steps left: %d\n", activeCmd.pin, activeCmd.durationSec, activeCmd.stepsLeft);

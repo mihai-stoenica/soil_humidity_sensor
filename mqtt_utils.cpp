@@ -24,7 +24,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   handleCommand(message);
 }
 
-void reconnect() {
+bool reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     
@@ -32,10 +32,11 @@ void reconnect() {
       client.publish("soil/device/" DEVICE_API_KEY "/status", "online", true);
       Serial.println("connected");
       client.subscribe("soil/device/" DEVICE_API_KEY "/command");
+      return true;
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
-      delay(5000);
+      return false;
     }
   }
 }
