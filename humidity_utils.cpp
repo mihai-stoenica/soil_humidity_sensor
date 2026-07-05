@@ -14,10 +14,10 @@ bool firstRun = true;
 
 const float ALPHA = 0.2;                
 
-DHT dht(DHTPIN, DHTTYPE);
+DHT dht(Config::DHTPIN, DHTTYPE);
 
 int takeSample() {
-  int rawValue = analogRead(SENSOR_PIN);
+  int rawValue = analogRead(Config::HUMIDITY_PIN);
 
   Serial.print("Raw ADC Value: ");
   Serial.print(rawValue);

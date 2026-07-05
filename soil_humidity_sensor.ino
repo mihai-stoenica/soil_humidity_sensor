@@ -4,33 +4,22 @@
 #include "command_utils.h"
 #include "humidity_utils.h"
 #include "mqtt_utils.h"
+#include "status.h"
+#include "config.h"
 
-const String apiKey = DEVICE_API_KEY;
-const String origin = ORIGIN;
-const String ws_url = WS_URL;
-
-unsigned long lastHeartbeat = 0;
 
 unsigned long lastSentSample = 0;
-const unsigned long sampleInterval = 2000;
-
 unsigned long lastSentRecord = 0;
-const unsigned recordInterval = 3600000;
-
-const int LED_PIN = 2;
-
-unsigned long lastBlink = 0;
 unsigned long lastMqttReconnectAttempt = 0;
 
 void setup() {
   Serial.begin(115200);
 
-  pinMode(33, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
+  pinMode(Config::PUMP_PIN, OUTPUT);
+  digitalWrite(Config::PUMP_PIN, HIGH);
 
-  digitalWrite(33, HIGH);
-
-  digitalWrite(LED_PIN, LOW);
+  pinMode(Config::LED_PIN, OUTPUT);
+  digitalWrite(Config::LED_PIN, LOW);
 
   initWifi();
   initMqtt();
@@ -48,31 +37,35 @@ void loop() {
 
   handleWifiLoop();
 
-  if (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(LED_PIN, LOW);
-  } else if (!client.connected()) {
-    
-    if (now - lastBlink >= 500) {
-      lastBlink = now;
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN)); 
-    }
+  ConnState state = WiFi.status() != WL_CONNECTED 
+                      ? ConnState::WIFI_DOWN 
+                      : (!client.connected() 
+                            ? ConnState::MQTT_DOWN 
+                            : ConnState::CONNECTED);
 
-    if (now - lastMqttReconnectAttempt > 5000) {
-      lastMqttReconnectAttempt = now;
-      if (reconnect()) {
-        digitalWrite(LED_PIN, HIGH); 
+  updateStatusLed(state, now);
+
+  switch(state) {
+    case ConnState::WIFI_DOWN:
+    break;
+
+    case ConnState::MQTT_DOWN:
+      if (now - lastMqttReconnectAttempt > Config::MQTT_RETRY_INTERVAL_MS) {
+        lastMqttReconnectAttempt = now;
+        reconnect();
       }
-    }
-  } else {
-    if (now - lastSentSample >= sampleInterval) {
-      lastSentSample = now;
-      tryUpdateHumidity();
-    }
+      break;
 
-    if(now - lastSentRecord >= recordInterval) {
-      lastSentRecord = now;
-      sendRecord();
-    }
-    commandLoop(); 
+    case ConnState::CONNECTED:
+      if (now - lastSentSample >= Config::SAMPLE_INTERVAL_MS) {
+        lastSentSample = now;
+        tryUpdateHumidity();
+      }
+      if (now - lastSentRecord >= Config::RECORD_INTERVAL_MS) {
+        lastSentRecord = now;
+        sendRecord();
+      }
+      commandLoop();
+      break;
   }
 }

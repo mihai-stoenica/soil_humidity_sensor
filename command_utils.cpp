@@ -16,7 +16,7 @@ ActiveCommand activeCmd = {-1, 0, false, 0, 0, 0, false};
 static int commandToPin(int command) {
   switch (command) {
     case 1: 
-      return PIN_PUMP;
+      return Config::PUMP_PIN;
     default: 
       return -1;
   }
