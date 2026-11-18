@@ -1,6 +1,6 @@
 # ESP32 Soil Humidity & Plant Monitor
 
-An ESP32-based plant monitoring and automated watering controller built with PlatformIO and the Arduino framework. It reads environmental sensors, reports telemetry over MQTT, and controls a water pump.
+An ESP32-based plant monitoring and automated watering controller. It reads environmental sensors, reports telemetry over MQTT, and controls a water pump.
 
 ## Features
 
