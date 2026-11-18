@@ -79,7 +79,7 @@ void startBLE() {
 }
 
 void initWifi() {
-    /*Serial.println("Checking for saved WiFi...");
+    Serial.println("Checking for saved WiFi...");
     WiFi.begin(); 
 
     unsigned long startAttempt = millis();
@@ -94,12 +94,11 @@ void initWifi() {
     else {
         Serial.println("\nNo valid stored WiFi found. Starting BLE...");
         startBLE();
-    }*/
+    }
 
-    const char* ssid = "DIGI_c19b09";
-    const char* password = "6db1c892";
+    
 
-    Serial.println("Connecting to hardcoded WiFi...");
+    /*Serial.println("Connecting to hardcoded WiFi...");
     WiFi.begin(ssid, password); 
 
     unsigned long startAttempt = millis();
@@ -116,7 +115,7 @@ void initWifi() {
     else {
         Serial.println("\nFailed to connect to hardcoded WiFi. Check credentials.");
         // startBLE(); // Commented out to prevent BLE from starting during this test
-    }
+    }*/
 }
 
 void handleWifiLoop() {

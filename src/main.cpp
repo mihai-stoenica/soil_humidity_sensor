@@ -18,8 +18,7 @@ void setup() {
   pinMode(Config::PUMP_PIN, OUTPUT);
   digitalWrite(Config::PUMP_PIN, HIGH);
 
-  pinMode(Config::LED_PIN, OUTPUT);
-  digitalWrite(Config::LED_PIN, LOW);
+  initStatusLed(Config::LED_PIN);
 
   initWifi();
   initMqtt();
