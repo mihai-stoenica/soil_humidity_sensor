@@ -3,6 +3,7 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
 #include <ArduinoJson.h>
 
 #define SERVICE_UUID           "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -67,6 +68,7 @@ void startBLE() {
     pCredChar->setCallbacks(new MyCallbacks());
 
     pStatusChar = pService->createCharacteristic(STATUS_CHAR_UUID, BLECharacteristic::PROPERTY_NOTIFY);
+    pStatusChar->addDescriptor(new BLE2902());
 
     pService->start();
 
@@ -96,26 +98,6 @@ void initWifi() {
         startBLE();
     }
 
-    
-
-    /*Serial.println("Connecting to hardcoded WiFi...");
-    WiFi.begin(ssid, password); 
-
-    unsigned long startAttempt = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < 10000) {
-        delay(500);
-        Serial.print(".");
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("\nSuccessfully connected to WiFi!");
-        Serial.print("IP Address: ");
-        Serial.println(WiFi.localIP());
-    } 
-    else {
-        Serial.println("\nFailed to connect to hardcoded WiFi. Check credentials.");
-        // startBLE(); // Commented out to prevent BLE from starting during this test
-    }*/
 }
 
 void handleWifiLoop() {
@@ -139,6 +121,12 @@ void handleWifiLoop() {
                 pStatusChar->setValue("{\"status\":\"connected\"}");
                 pStatusChar->notify();
                 Serial.println("Notified App: Connected!");
+
+                delay(500);
+                BLEDevice::getAdvertising()->stop();
+                BLEDevice::deinit(true);
+                bleActive = false;
+                Serial.println("BLE stopped and deinitialized.");
             }
             attemptingConnection = false; 
         } 
