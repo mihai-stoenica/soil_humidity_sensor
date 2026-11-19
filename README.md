@@ -1,6 +1,7 @@
 # ESP32 Soil Humidity & Plant Monitor
 
 An ESP32-based plant monitoring and automated watering controller. It reads environmental sensors, reports telemetry over MQTT, and controls a water pump.
+[Hardware part design](https://github.com/mihai-stoenica/soil_humidity_pcb.git)
 
 ## Features
 

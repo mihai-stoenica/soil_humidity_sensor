@@ -6,7 +6,7 @@
 #include "mqtt_utils.h"
 #include "status.h"
 #include "config.h"
-#include "humidity_utils.h"
+#include "lcd_utils.h"
 
 unsigned long lastSentSample = 0;
 unsigned long lastSentRecord = 0;
@@ -23,6 +23,7 @@ void setup() {
   initWifi();
   initMqtt();
   dht.begin();
+  initLcd();
 
   if(WiFi.status() == WL_CONNECTED) {
     sendRecord();
@@ -44,6 +45,7 @@ void loop() {
                             : ConnState::CONNECTED);
 
   updateStatusLed(state, now);
+  handleLcdLoop(now);
 
   switch(state) {
     case ConnState::WIFI_DOWN:
