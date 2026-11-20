@@ -22,4 +22,5 @@ namespace Config {
   constexpr unsigned long DB_SAVE_INTERVAL_MS = 3600000;
   constexpr unsigned long LIVE_CHECK_INTERVAL_MS = 20000;
   constexpr unsigned long MQTT_RETRY_INTERVAL_MS = 5000;
+  constexpr int MQTT_MAX_RETRIES = 1;
 }
