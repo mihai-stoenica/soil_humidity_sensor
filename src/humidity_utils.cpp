@@ -5,6 +5,31 @@
 const int dryValue = 4000;
 const int wetValue = 0;
 
+const int LDR_DARK_RAW   = 200;    
+const int LDR_BRIGHT_RAW = 3800;   
+
+static int readAnalogAvg(int pin, int n = 8) {
+  uint32_t sum = 0;
+  for (int i = 0; i < n; i++) {
+    sum += analogRead(pin);
+    delayMicroseconds(300);
+  }
+  return sum / n;
+}
+
+static int rawToPercent(int raw, int rawAt0, int rawAt100) {
+  float p = (float)(raw - rawAt0) * 100.0f / (float)(rawAt100 - rawAt0);
+  if (p < 0) p = 0;
+  if (p > 100) p = 100;
+  return (int)(p + 0.5f);
+}
+
+void initSensors() {
+  dht.begin();
+  analogReadResolution(12);
+  analogSetPinAttenuation(Config::LIGHT_PIN, ADC_11db);
+}
+
 static float smoothedHumidity = -1;   
 
 static int lastSentHumidity = -1;
@@ -36,8 +61,8 @@ SensorData takeSample() {
   data.temperature = dht.readTemperature();
   data.isValid = !isnan(data.temperature); 
 
-  int rawLight = analogRead(Config::LIGHT_PIN);
-  data.lightLevel = constrain(map(rawLight, 0, 4095, 0, 100), 0, 100);
+  int rawLight = readAnalogAvg(Config::LIGHT_PIN);
+  data.lightLevel = rawToPercent(rawLight, LDR_DARK_RAW, LDR_BRIGHT_RAW);
 
   return data;
 }

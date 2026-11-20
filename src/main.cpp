@@ -7,6 +7,7 @@
 #include "status.h"
 #include "config.h"
 #include "lcd_utils.h"
+#include "humidity_utils.h"
 
 unsigned long lastSentSample = 0;
 unsigned long lastSentRecord = 0;
@@ -22,7 +23,7 @@ void setup() {
 
   initWifi();
   initMqtt();
-  dht.begin();
+  initSensors();
   initLcd();
 
   if(WiFi.status() == WL_CONNECTED) {

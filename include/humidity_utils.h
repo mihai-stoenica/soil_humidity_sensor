@@ -16,6 +16,7 @@ struct SensorData {
   bool isValid;
 };
 
+void initSensors();
 SensorData takeSample();
 int getSmoothedHumidity();
 bool shouldSend(SensorData& data);
