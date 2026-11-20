@@ -12,6 +12,7 @@
 unsigned long lastSentSample = 0;
 unsigned long lastSentRecord = 0;
 unsigned long lastMqttReconnectAttempt = 0;
+int mqttRetryCount = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -50,16 +51,25 @@ void loop() {
 
   switch(state) {
     case ConnState::WIFI_DOWN:
-    break;
+      mqttRetryCount = 0; // Reset retry counter if Wi-Fi reconnects later
+      break;
 
     case ConnState::MQTT_DOWN:
-      if (now - lastMqttReconnectAttempt > Config::MQTT_RETRY_INTERVAL_MS) {
+      if (mqttRetryCount < Config::MQTT_MAX_RETRIES &&
+          now - lastMqttReconnectAttempt > Config::MQTT_RETRY_INTERVAL_MS) {
         lastMqttReconnectAttempt = now;
-        reconnect();
+        mqttRetryCount++;
+        Serial.printf("MQTT attempt %d/%d...\n", mqttRetryCount, Config::MQTT_MAX_RETRIES);
+        if (reconnect()) {
+          mqttRetryCount = 0;
+        } else if (mqttRetryCount >= Config::MQTT_MAX_RETRIES) {
+          Serial.println("\nMax MQTT retries reached. Stopping MQTT connection attempts.");
+        }
       }
       break;
 
     case ConnState::CONNECTED:
+      mqttRetryCount = 0;
       if (now - lastSentSample >= Config::DB_SAVE_INTERVAL_MS) {
         lastSentSample = now;
         sendRecord();

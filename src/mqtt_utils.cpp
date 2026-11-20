@@ -47,6 +47,7 @@ void sendMessage(String& payload) {
 }
 
 void initMqtt() {
+  espClient.setTimeout(2); // 2-second TCP connect timeout so it doesn't freeze loop()
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 }

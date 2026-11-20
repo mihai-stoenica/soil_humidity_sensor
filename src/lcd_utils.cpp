@@ -1,6 +1,8 @@
 #include "lcd_utils.h"
 #include "config.h"
 #include "humidity_utils.h"
+#include "wifi_utils.h"
+#include "mqtt_utils.h"
 
 #include <SPI.h>
 #include <Adafruit_GFX.h>
@@ -30,47 +32,92 @@ static void setDisplaySleep(bool sleep) {
   delay(5);
 }
 
+static void drawProgressBar(int x, int y, int w, int h, int percent, uint16_t color) {
+  int clamped = constrain(percent, 0, 100);
+  int fillW = ((w - 2) * clamped) / 100;
+  tft.drawRect(x, y, w, h, 0x4208); // Subtle dark gray border
+  if (fillW > 0) {
+    tft.fillRect(x + 1, y + 1, fillW, h - 2, color);
+  }
+}
+
 static void renderSensorData() {
   SensorData data = takeSample();
+  bool wifiUp = (WiFi.status() == WL_CONNECTED);
+  bool serverUp = (wifiUp && client.connected());
 
   tft.fillScreen(ST77XX_BLACK);
 
+  // Header
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_CYAN);
-  tft.setCursor(10, 8);
+  tft.setCursor(22, 6);
   tft.print("PLANT MONITOR");
-  tft.drawFastHLine(0, 20, tft.width(), ST77XX_CYAN);
+  tft.drawFastHLine(0, 17, tft.width(), ST77XX_CYAN);
 
+  // Soil Moisture + mini progress bar
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_WHITE);
-  tft.setCursor(8, 30);
+  tft.setCursor(6, 22);
   tft.print("Soil Moisture:");
   tft.setTextSize(2);
   tft.setTextColor(ST77XX_GREEN);
-  tft.setCursor(8, 42);
-  tft.printf("%d %%", data.humidity);
+  tft.setCursor(6, 33);
+  tft.printf("%d%%", data.humidity);
+  drawProgressBar(72, 37, 50, 8, data.humidity, ST77XX_GREEN);
 
+  // Temperature
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_WHITE);
-  tft.setCursor(8, 68);
+  tft.setCursor(6, 54);
   tft.print("Temperature:");
   tft.setTextSize(2);
   tft.setTextColor(ST77XX_YELLOW);
-  tft.setCursor(8, 80);
+  tft.setCursor(6, 65);
   if (data.isValid) {
     tft.printf("%.1f C", data.temperature);
   } else {
     tft.print("--.- C");
   }
 
+  // Light Level + mini progress bar
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_WHITE);
-  tft.setCursor(8, 106);
+  tft.setCursor(6, 86);
   tft.print("Light Level:");
   tft.setTextSize(2);
   tft.setTextColor(ST77XX_ORANGE);
-  tft.setCursor(8, 118);
-  tft.printf("%d %%", data.lightLevel);
+  tft.setCursor(6, 97);
+  tft.printf("%d%%", data.lightLevel);
+  drawProgressBar(72, 101, 50, 8, data.lightLevel, ST77XX_ORANGE);
+
+  // Bottom Status Bar (Wi-Fi & MQTT Server)
+  tft.drawFastHLine(0, 118, tft.width(), 0x4208);
+
+  // Wi-Fi status line with color indicator dot
+  uint16_t wifiColor = wifiUp ? ST77XX_GREEN : (bleActive ? ST77XX_CYAN : ST77XX_RED);
+  tft.fillCircle(10, 128, 3, wifiColor);
+  tft.setTextSize(1);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setCursor(18, 125);
+  tft.print("WiFi: ");
+  tft.setTextColor(wifiColor);
+  tft.print(wifiUp ? "Connected" : (bleActive ? "BLE Setup" : "Offline"));
+
+  // Server (MQTT) status line with color indicator dot
+  uint16_t srvColor = serverUp ? ST77XX_GREEN : ST77XX_RED;
+  tft.fillCircle(10, 142, 3, srvColor);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setCursor(18, 139);
+  tft.print("Srv:  ");
+  tft.setTextColor(srvColor);
+  tft.print(serverUp ? "Online" : "Unconnected");
+
+  // Time remaining indicator bar at the very bottom edge (158..159)
+  unsigned long elapsed = millis() - lcdTurnedOnAt;
+  int remainPct = 100 - constrain((int)((elapsed * 100UL) / Config::LCD_ON_DURATION_MS), 0, 100);
+  int barW = (tft.width() * remainPct) / 100;
+  tft.fillRect(0, 158, barW, 2, ST77XX_CYAN);
 }
 
 void initLcd() {

@@ -5,23 +5,38 @@
 const int dryValue = 4000;
 const int wetValue = 0;
 
-const int LDR_DARK_RAW   = 200;    
-const int LDR_BRIGHT_RAW = 3800;   
+const float LDR_PULLDOWN_OHMS = 5100.0f;
+const float LDR_VCC_MV        = 3300.0f;
+const float LDR_ADC_MAX_MV    = 3145.0f;  // ESP32 ADC_11db saturation ceiling (~3140 mV)
+const float LDR_DARK_OHMS     = 45000.0f; // Covered with finger (~340 mV) -> 0 %
+const float LDR_BRIGHT_OHMS   = 220.0f;   // Direct sun / full light ceiling -> 100 % (full flashlight ~95%)
 
-static int readAnalogAvg(int pin, int n = 8) {
+static int readMilliVoltsAvg(int pin, int n = 8) {
   uint32_t sum = 0;
   for (int i = 0; i < n; i++) {
-    sum += analogRead(pin);
+    sum += analogReadMilliVolts(pin);
     delayMicroseconds(300);
   }
   return sum / n;
 }
 
-static int rawToPercent(int raw, int rawAt0, int rawAt100) {
-  float p = (float)(raw - rawAt0) * 100.0f / (float)(rawAt100 - rawAt0);
-  if (p < 0) p = 0;
-  if (p > 100) p = 100;
-  return (int)(p + 0.5f);
+static int mvToLightPercent(int mv) {
+  if (mv <= 50) return 0;
+  if (mv >= (int)LDR_ADC_MAX_MV) return 96;
+
+  // True voltage divider equation: Vout = 3300mV * R_pulldown / (R_ldr + R_pulldown)
+  float rLdr = LDR_PULLDOWN_OHMS * (LDR_VCC_MV - (float)mv) / (float)mv;
+
+  if (rLdr >= LDR_DARK_OHMS) return 0;
+  if (rLdr <= LDR_BRIGHT_OHMS) return 100;
+
+  // Logarithmic mapping (matches LDR physics & human eye perception)
+  float logDark   = log10f(LDR_DARK_OHMS);
+  float logBright = log10f(LDR_BRIGHT_OHMS);
+  float logCurr   = log10f(rLdr);
+
+  float pct = (logDark - logCurr) * 100.0f / (logDark - logBright);
+  return constrain((int)(pct + 0.5f), 0, 100);
 }
 
 void initSensors() {
@@ -61,8 +76,8 @@ SensorData takeSample() {
   data.temperature = dht.readTemperature();
   data.isValid = !isnan(data.temperature); 
 
-  int rawLight = readAnalogAvg(Config::LIGHT_PIN);
-  data.lightLevel = rawToPercent(rawLight, LDR_DARK_RAW, LDR_BRIGHT_RAW);
+  int lightMv = readMilliVoltsAvg(Config::LIGHT_PIN);
+  data.lightLevel = mvToLightPercent(lightMv);
 
   return data;
 }
