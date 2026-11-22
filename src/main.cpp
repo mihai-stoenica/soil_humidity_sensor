@@ -51,7 +51,7 @@ void loop() {
 
   switch(state) {
     case ConnState::WIFI_DOWN:
-      mqttRetryCount = 0; // Reset retry counter if Wi-Fi reconnects later
+      mqttRetryCount = 0; 
       break;
 
     case ConnState::MQTT_DOWN:
