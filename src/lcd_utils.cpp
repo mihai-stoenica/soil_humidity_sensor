@@ -35,7 +35,7 @@ static void setDisplaySleep(bool sleep) {
 static void drawProgressBar(int x, int y, int w, int h, int percent, uint16_t color) {
   int clamped = constrain(percent, 0, 100);
   int fillW = ((w - 2) * clamped) / 100;
-  tft.drawRect(x, y, w, h, 0x4208); // Subtle dark gray border
+  tft.drawRect(x, y, w, h, 0x4208);
   if (fillW > 0) {
     tft.fillRect(x + 1, y + 1, fillW, h - 2, color);
   }
@@ -48,14 +48,12 @@ static void renderSensorData() {
 
   tft.fillScreen(ST77XX_BLACK);
 
-  // Header
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_CYAN);
   tft.setCursor(22, 6);
   tft.print("PLANT MONITOR");
   tft.drawFastHLine(0, 17, tft.width(), ST77XX_CYAN);
 
-  // Soil Moisture + mini progress bar
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_WHITE);
   tft.setCursor(6, 22);
@@ -66,7 +64,6 @@ static void renderSensorData() {
   tft.printf("%d%%", data.humidity);
   drawProgressBar(72, 37, 50, 8, data.humidity, ST77XX_GREEN);
 
-  // Temperature
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_WHITE);
   tft.setCursor(6, 54);
@@ -80,7 +77,6 @@ static void renderSensorData() {
     tft.print("--.- C");
   }
 
-  // Light Level + mini progress bar
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_WHITE);
   tft.setCursor(6, 86);
@@ -91,10 +87,8 @@ static void renderSensorData() {
   tft.printf("%d%%", data.lightLevel);
   drawProgressBar(72, 101, 50, 8, data.lightLevel, ST77XX_ORANGE);
 
-  // Bottom Status Bar (Wi-Fi & MQTT Server)
   tft.drawFastHLine(0, 118, tft.width(), 0x4208);
 
-  // Wi-Fi status line with color indicator dot
   uint16_t wifiColor = wifiUp ? ST77XX_GREEN : (bleActive ? ST77XX_CYAN : ST77XX_RED);
   tft.fillCircle(10, 128, 3, wifiColor);
   tft.setTextSize(1);
@@ -104,7 +98,6 @@ static void renderSensorData() {
   tft.setTextColor(wifiColor);
   tft.print(wifiUp ? "Connected" : (bleActive ? "BLE Setup" : "Offline"));
 
-  // Server (MQTT) status line with color indicator dot
   uint16_t srvColor = serverUp ? ST77XX_GREEN : ST77XX_RED;
   tft.fillCircle(10, 142, 3, srvColor);
   tft.setTextColor(ST77XX_WHITE);
@@ -113,7 +106,6 @@ static void renderSensorData() {
   tft.setTextColor(srvColor);
   tft.print(serverUp ? "Online" : "Unconnected");
 
-  // Time remaining indicator bar at the very bottom edge (158..159)
   unsigned long elapsed = millis() - lcdTurnedOnAt;
   int remainPct = 100 - constrain((int)((elapsed * 100UL) / Config::LCD_ON_DURATION_MS), 0, 100);
   int barW = (tft.width() * remainPct) / 100;
