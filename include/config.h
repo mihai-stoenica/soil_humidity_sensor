@@ -6,6 +6,8 @@ namespace Config {
   constexpr int HUMIDITY_PIN = 34;
   constexpr int DHTPIN = 26;  
   constexpr int LIGHT_PIN = 36; 
+  constexpr int PG_PIN = 33;
+  constexpr int USB_PG_THRESHOLD_MV = 250;
 
   constexpr int BUTTON_PIN = 25;
   constexpr int TFT_BLK_PIN = 32;
@@ -23,4 +25,7 @@ namespace Config {
   constexpr unsigned long LIVE_CHECK_INTERVAL_MS = 20000;
   constexpr unsigned long MQTT_RETRY_INTERVAL_MS = 5000;
   constexpr int MQTT_MAX_RETRIES = 1;
+  constexpr unsigned long BLE_TIMEOUT_MS = 180000;
+  constexpr uint64_t BATTERY_SLEEP_INTERVAL_US = 3600ULL * 1000000ULL;
+  constexpr unsigned long BATTERY_MQTT_WAIT_MS = 2000;
 }

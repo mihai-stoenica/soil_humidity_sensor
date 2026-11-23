@@ -7,12 +7,83 @@
 #include "status.h"
 #include "config.h"
 #include "lcd_utils.h"
-#include "humidity_utils.h"
+#include "power_utils.h"
 
 unsigned long lastSentSample = 0;
 unsigned long lastSentRecord = 0;
 unsigned long lastMqttReconnectAttempt = 0;
 int mqttRetryCount = 0;
+
+static void runBatteryScheduledCycle() {
+  initStatusLed(Config::LED_PIN);
+  initWifi();
+  initMqtt();
+
+  for (int i = 0; i < 5; i++) {
+    SensorData s = takeSample();
+    if (s.isValid) break;
+    delay(500);
+  }
+
+  while (bleActive && WiFi.status() != WL_CONNECTED) {
+    unsigned long now = millis();
+    handleWifiLoop();
+    updateStatusLed(ConnState::WIFI_DOWN, now);
+    handleLcdLoop(now, true);
+    if (isUsbPowered()) return;
+    delay(10);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    sendRecord();
+    if (reconnect()) {
+      tryUpdateLiveData();
+      unsigned long listenStart = millis();
+      while (millis() - listenStart < Config::BATTERY_MQTT_WAIT_MS || isCommandActive() || isLcdActive()) {
+        unsigned long now = millis();
+        client.loop();
+        commandLoop();
+        updateStatusLed(ConnState::CONNECTED, now);
+        handleLcdLoop(now, true);
+        if (isUsbPowered()) return;
+        delay(10);
+      }
+    }
+  }
+
+  while (isLcdActive()) {
+    unsigned long now = millis();
+    handleLcdLoop(now, true);
+    if (isUsbPowered()) return;
+    delay(10);
+  }
+
+  digitalWrite(Config::LED_PIN, LOW);
+  markScheduledWakeCompleted();
+  enterBatteryDeepSleep();
+}
+
+static void runBatteryButtonCycle() {
+  wakeLcd(millis(), true);
+
+  while (isLcdActive()) {
+    unsigned long now = millis();
+    handleLcdLoop(now, true);
+    if (isUsbPowered()) return;
+    if (isScheduledWakeDue()) {
+      runBatteryScheduledCycle();
+      return;
+    }
+    delay(10);
+  }
+
+  if (isScheduledWakeDue()) {
+    runBatteryScheduledCycle();
+    return;
+  }
+
+  enterBatteryDeepSleep();
+}
 
 void setup() {
   Serial.begin(115200);
@@ -20,22 +91,37 @@ void setup() {
   pinMode(Config::PUMP_PIN, OUTPUT);
   digitalWrite(Config::PUMP_PIN, HIGH);
 
-  initStatusLed(Config::LED_PIN);
-
-  initWifi();
-  initMqtt();
+  initPower();
   initSensors();
   initLcd();
 
-  if(WiFi.status() == WL_CONNECTED) {
-    sendRecord();
-    lastSentRecord = millis();
+  if (!isUsbPowered()) {
+    if (isButtonWakeup() && !isScheduledWakeDue() && hasCachedSensorData()) {
+      runBatteryButtonCycle();
+    } else {
+      runBatteryScheduledCycle();
+    }
   }
 
+  initStatusLed(Config::LED_PIN);
+  initWifi();
+  initMqtt();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    sendRecord();
+    lastSentSample = millis();
+    lastSentRecord = millis();
+  }
 }
 
 void loop() {
   unsigned long now = millis();
+
+  if (!isUsbPowered() && !bleActive && !isCommandActive() && !isLcdActive()) {
+    digitalWrite(Config::LED_PIN, LOW);
+    markScheduledWakeCompleted();
+    enterBatteryDeepSleep();
+  }
 
   handleWifiLoop();
   client.loop();

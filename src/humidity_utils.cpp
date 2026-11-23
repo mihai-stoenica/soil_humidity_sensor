@@ -43,7 +43,9 @@ void initSensors() {
   analogSetPinAttenuation(Config::LIGHT_PIN, ADC_11db);
 }
 
-static float smoothedHumidity = -1;   
+RTC_DATA_ATTR static float smoothedHumidity = -1;
+RTC_DATA_ATTR static SensorData cachedData = {0, 0.0f, 0, false};
+RTC_DATA_ATTR static bool hasCached = false;
 
 static int lastSentHumidity = -1;
 static float lastSentTemp = -100.0;
@@ -77,7 +79,22 @@ SensorData takeSample() {
   int lightMv = readMilliVoltsAvg(Config::LIGHT_PIN);
   data.lightLevel = mvToLightPercent(lightMv);
 
+  if (data.isValid) {
+    cachedData = data;
+    hasCached = true;
+  } else if (!hasCached) {
+    cachedData = data;
+  }
+
   return data;
+}
+
+SensorData getCachedSensorData() {
+  return cachedData;
+}
+
+bool hasCachedSensorData() {
+  return hasCached;
 }
 
 bool shouldSend(SensorData& data) {

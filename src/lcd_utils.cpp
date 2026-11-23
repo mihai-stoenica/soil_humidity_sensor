@@ -41,8 +41,8 @@ static void drawProgressBar(int x, int y, int w, int h, int percent, uint16_t co
   }
 }
 
-static void renderSensorData() {
-  SensorData data = takeSample();
+static void renderSensorData(bool useCached = false) {
+  SensorData data = (useCached && hasCachedSensorData()) ? getCachedSensorData() : takeSample();
   bool wifiUp = (WiFi.status() == WL_CONNECTED);
   bool serverUp = (wifiUp && client.connected());
 
@@ -125,7 +125,24 @@ void initLcd() {
   lcdActive = false;
 }
 
-void handleLcdLoop(unsigned long now) {
+void wakeLcd(unsigned long now, bool useCached) {
+  lcdTurnedOnAt = now;
+  lastLcdRefresh = now;
+  lastDebounceTime = now;
+  lastButtonState = digitalRead(Config::BUTTON_PIN);
+
+  if (!lcdActive) {
+    lcdActive = true;
+    setDisplaySleep(false);
+  }
+  renderSensorData(useCached);
+}
+
+bool isLcdActive() {
+  return lcdActive;
+}
+
+void handleLcdLoop(unsigned long now, bool useCached) {
   bool reading = digitalRead(Config::BUTTON_PIN);
 
   if (reading != lastButtonState) {
@@ -141,7 +158,7 @@ void handleLcdLoop(unsigned long now) {
           lcdActive = true;
           setDisplaySleep(false);
         }
-        renderSensorData();
+        renderSensorData(useCached);
       }
     }
   }
@@ -153,7 +170,7 @@ void handleLcdLoop(unsigned long now) {
       lcdActive = false;
     } else if (now - lastLcdRefresh >= Config::LCD_REFRESH_INTERVAL_MS) {
       lastLcdRefresh = now;
-      renderSensorData();
+      renderSensorData(useCached);
     }
   }
 }

@@ -1,4 +1,5 @@
 #include "wifi_utils.h"
+#include "config.h"
 
 #include <BLEDevice.h>
 #include <BLEUtils.h>
@@ -19,6 +20,7 @@ bool newCredentialsReceived = false;
 String newSSID = "";
 String newPass = "";
 unsigned long connectionStartTime = 0;
+unsigned long bleStartTime = 0;
 bool attemptingConnection = false;
 
 class MyCallbacks: public BLECharacteristicCallbacks {
@@ -58,6 +60,14 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     }
 };
 
+void stopBLE() {
+    if (!bleActive) return;
+    BLEDevice::getAdvertising()->stop();
+    BLEDevice::deinit(true);
+    bleActive = false;
+    Serial.println("BLE stopped and deinitialized.");
+}
+
 void startBLE() {
     BLEDevice::init("PROV_MyESP32");
     BLEServer *pServer = BLEDevice::createServer();
@@ -78,6 +88,7 @@ void startBLE() {
     BLEDevice::startAdvertising();
     Serial.println("BLE Provisioning Active...");
     bleActive = true;
+    bleStartTime = millis();
 }
 
 void initWifi() {
@@ -101,10 +112,16 @@ void initWifi() {
 }
 
 void handleWifiLoop() {
+    if (bleActive && !attemptingConnection && millis() - bleStartTime >= Config::BLE_TIMEOUT_MS) {
+        Serial.println("BLE Provisioning timed out.");
+        stopBLE();
+    }
+
     if (newCredentialsReceived) {
         newCredentialsReceived = false; 
         attemptingConnection = true;     
         connectionStartTime = millis();  
+        bleStartTime = millis();
         
         Serial.println("\n--- Applying new WiFi credentials ---");
         WiFi.disconnect(); 
@@ -123,10 +140,7 @@ void handleWifiLoop() {
                 Serial.println("Notified App: Connected!");
 
                 delay(500);
-                BLEDevice::getAdvertising()->stop();
-                BLEDevice::deinit(true);
-                bleActive = false;
-                Serial.println("BLE stopped and deinitialized.");
+                stopBLE();
             }
             attemptingConnection = false; 
         } 
@@ -139,6 +153,7 @@ void handleWifiLoop() {
             }
             WiFi.disconnect();            
             attemptingConnection = false; 
+            bleStartTime = millis();
         }
     }
 }
