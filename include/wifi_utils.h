@@ -8,5 +8,6 @@ extern bool bleActive;
 
 void initWifi();
 void handleWifiLoop();
+void resetWifiAndStartBle();
 
 #endif 

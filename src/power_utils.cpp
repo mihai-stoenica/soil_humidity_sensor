@@ -1,5 +1,6 @@
 #include "power_utils.h"
 #include "config.h"
+#include <driver/gpio.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
 #include <sys/time.h>
@@ -14,6 +15,22 @@ static uint64_t getRtcTimeUs() {
 
 void initPower() {
   analogSetPinAttenuation(Config::PG_PIN, ADC_11db);
+
+  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+  bool usb = isUsbPowered();
+  const char* modeStr = usb ? "USB Powered" : "Battery Powered";
+
+  switch (cause) {
+    case ESP_SLEEP_WAKEUP_EXT0:
+      Serial.printf("\n[POWER] Woke up from Deep Sleep via BUTTON press (%s)\n", modeStr);
+      break;
+    case ESP_SLEEP_WAKEUP_TIMER:
+      Serial.printf("\n[POWER] Woke up from Deep Sleep via SCHEDULED TIMER (%s)\n", modeStr);
+      break;
+    default:
+      Serial.printf("\n[POWER] Cold boot / Reset (%s)\n", modeStr);
+      break;
+  }
 }
 
 bool isUsbPowered() {
@@ -66,6 +83,18 @@ void enterBatteryDeepSleep() {
   while (digitalRead(Config::BUTTON_PIN) == LOW) {
     delay(10);
   }
+
+  Serial.printf("[POWER] Entering Deep Sleep for %llu seconds (or until button press)...\n", sleepUs / 1000000ULL);
+  Serial.flush();
+
+  int offLevel = (Config::TFT_BL_ON_LEVEL == HIGH) ? 0 : 1;
+  gpio_num_t blPin = (gpio_num_t)Config::TFT_BLK_PIN;
+  gpio_hold_dis(blPin);
+  rtc_gpio_hold_dis(blPin);
+  rtc_gpio_init(blPin);
+  rtc_gpio_set_direction(blPin, RTC_GPIO_MODE_OUTPUT_ONLY);
+  rtc_gpio_set_level(blPin, offLevel);
+  rtc_gpio_hold_en(blPin);
 
   esp_sleep_enable_timer_wakeup(sleepUs);
   esp_sleep_enable_ext0_wakeup((gpio_num_t)Config::BUTTON_PIN, 0);

@@ -21,6 +21,8 @@ namespace Config {
   constexpr unsigned long LCD_ON_DURATION_MS = 8000;
   constexpr unsigned long LCD_REFRESH_INTERVAL_MS = 2000;
 
+  constexpr unsigned long BTN_HOLD_PROVISION_MS = 5000;
+
   constexpr unsigned long DB_SAVE_INTERVAL_MS = 3600000;
   constexpr unsigned long LIVE_CHECK_INTERVAL_MS = 20000;
   constexpr unsigned long MQTT_RETRY_INTERVAL_MS = 5000;

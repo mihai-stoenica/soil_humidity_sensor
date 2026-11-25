@@ -1,5 +1,6 @@
 #include "wifi_utils.h"
 #include "config.h"
+#include "secrets.h"
 
 #include <BLEDevice.h>
 #include <BLEUtils.h>
@@ -10,11 +11,14 @@
 #define SERVICE_UUID           "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CRED_CHAR_UUID         "beb5483e-36e1-4688-b7f5-ea07361b26a9"
 #define STATUS_CHAR_UUID       "beb5483e-36e1-4688-b7f5-ea07361b26aa"
+#define INFO_CHAR_UUID         "beb5483e-36e1-4688-b7f5-ea07361b26ab"
 
 WiFiClient espClient;
 bool bleActive = false;
 
-BLECharacteristic *pStatusChar;
+BLECharacteristic *pStatusChar = nullptr;
+BLECharacteristic *pInfoChar = nullptr;
+volatile bool keysReadByClient = false;
 String jsonBuffer = ""; 
 bool newCredentialsReceived = false;
 String newSSID = "";
@@ -22,6 +26,12 @@ String newPass = "";
 unsigned long connectionStartTime = 0;
 unsigned long bleStartTime = 0;
 bool attemptingConnection = false;
+
+class InfoCharCallbacks : public BLECharacteristicCallbacks {
+    void onRead(BLECharacteristic *pCharacteristic) override {
+        keysReadByClient = true;
+    }
+};
 
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
@@ -77,8 +87,16 @@ void startBLE() {
     BLECharacteristic *pCredChar = pService->createCharacteristic(CRED_CHAR_UUID, BLECharacteristic::PROPERTY_WRITE);
     pCredChar->setCallbacks(new MyCallbacks());
 
-    pStatusChar = pService->createCharacteristic(STATUS_CHAR_UUID, BLECharacteristic::PROPERTY_NOTIFY);
+    pStatusChar = pService->createCharacteristic(
+        STATUS_CHAR_UUID,
+        BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ
+    );
     pStatusChar->addDescriptor(new BLE2902());
+
+    pInfoChar = pService->createCharacteristic(INFO_CHAR_UUID, BLECharacteristic::PROPERTY_READ);
+    String infoPayload = String("{\"apiKey\":\"") + DEVICE_API_KEY + "\",\"secret\":\"" + DEVICE_SECRET + "\"}";
+    pInfoChar->setValue(infoPayload.c_str());
+    pInfoChar->setCallbacks(new InfoCharCallbacks());
 
     pService->start();
 
@@ -89,6 +107,21 @@ void startBLE() {
     Serial.println("BLE Provisioning Active...");
     bleActive = true;
     bleStartTime = millis();
+}
+
+void resetWifiAndStartBle() {
+    Serial.println("Resetting saved WiFi credentials and starting BLE provisioning...");
+    attemptingConnection = false;
+    newCredentialsReceived = false;
+    jsonBuffer = "";
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true, true);
+    delay(200);
+    if (!bleActive) {
+        startBLE();
+    } else {
+        bleStartTime = millis();
+    }
 }
 
 void initWifi() {
@@ -135,11 +168,17 @@ void handleWifiLoop() {
         if (WiFi.status() == WL_CONNECTED) {
             Serial.println("Successfully connected!");
             if (bleActive) {
+                keysReadByClient = false;
                 pStatusChar->setValue("{\"status\":\"connected\"}");
                 pStatusChar->notify();
                 Serial.println("Notified App: Connected!");
 
-                delay(500);
+                unsigned long waitStart = millis();
+                while (!keysReadByClient && (millis() - waitStart) < 5000) {
+                    delay(50);
+                }
+
+                delay(300);
                 stopBLE();
             }
             attemptingConnection = false; 

@@ -66,11 +66,20 @@ static void runBatteryScheduledCycle() {
 static void runBatteryButtonCycle() {
   wakeLcd(millis(), true);
 
-  while (isLcdActive()) {
+  while (isLcdActive() || bleActive) {
     unsigned long now = millis();
     handleLcdLoop(now, true);
+    if (bleActive) {
+      static bool ledInited = false;
+      if (!ledInited) {
+        initStatusLed(Config::LED_PIN);
+        ledInited = true;
+      }
+      handleWifiLoop();
+      updateStatusLed(ConnState::WIFI_DOWN, now);
+    }
     if (isUsbPowered()) return;
-    if (isScheduledWakeDue()) {
+    if (!bleActive && isScheduledWakeDue()) {
       runBatteryScheduledCycle();
       return;
     }
@@ -134,6 +143,7 @@ void loop() {
 
   updateStatusLed(state, now);
   handleLcdLoop(now);
+  commandLoop();
 
   switch(state) {
     case ConnState::WIFI_DOWN:
@@ -164,7 +174,6 @@ void loop() {
         lastSentRecord = now;
         tryUpdateLiveData();
       }
-      commandLoop();
       break;
   }
 }
