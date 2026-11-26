@@ -7,6 +7,8 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
+#include <driver/gpio.h>
+#include <driver/rtc_io.h>
 
 static Adafruit_ST7735 tft(Config::TFT_CS_PIN, Config::TFT_RS_PIN, Config::TFT_RST_PIN);
 
@@ -18,11 +20,22 @@ static bool lastButtonState = HIGH;
 static unsigned long lastDebounceTime = 0;
 static constexpr unsigned long DEBOUNCE_DELAY_MS = 50;
 
+static bool buttonHeld = false;
+static unsigned long buttonPressStart = 0;
+static bool resetTriggeredDuringHold = false;
+static int lastRenderedHoldStage = -1;
+static unsigned long lastHoldBarDraw = 0;
+
 static void backlightWrite(bool on) {
-  digitalWrite(
-    Config::TFT_BLK_PIN,
-    on ? Config::TFT_BL_ON_LEVEL : (Config::TFT_BL_ON_LEVEL == HIGH ? LOW : HIGH)
-  );
+  int level = on ? Config::TFT_BL_ON_LEVEL : (Config::TFT_BL_ON_LEVEL == HIGH ? LOW : HIGH);
+  gpio_num_t pin = (gpio_num_t)Config::TFT_BLK_PIN;
+  rtc_gpio_hold_dis(pin);
+  gpio_hold_dis(pin);
+  if (rtc_gpio_is_valid_gpio(pin)) {
+    rtc_gpio_deinit(pin);
+  }
+  pinMode(Config::TFT_BLK_PIN, OUTPUT);
+  digitalWrite(Config::TFT_BLK_PIN, level);
 }
 
 static void setDisplaySleep(bool sleep) {
@@ -41,8 +54,17 @@ static void drawProgressBar(int x, int y, int w, int h, int percent, uint16_t co
   }
 }
 
-static void renderSensorData() {
-  SensorData data = takeSample();
+static void renderHoldBanner(const char* text, uint16_t color, int progressPct) {
+  tft.fillRect(0, 120, tft.width(), 40, ST77XX_BLACK);
+  tft.setTextSize(1);
+  tft.setTextColor(color);
+  tft.setCursor(6, 128);
+  tft.print(text);
+  drawProgressBar(6, 142, tft.width() - 12, 10, progressPct, color);
+}
+
+static void renderSensorData(bool useCached = false) {
+  SensorData data = (useCached && hasCachedSensorData()) ? getCachedSensorData() : takeSample();
   bool wifiUp = (WiFi.status() == WL_CONNECTED);
   bool serverUp = (wifiUp && client.connected());
 
@@ -89,14 +111,14 @@ static void renderSensorData() {
 
   tft.drawFastHLine(0, 118, tft.width(), 0x4208);
 
-  uint16_t wifiColor = wifiUp ? ST77XX_GREEN : (bleActive ? ST77XX_CYAN : ST77XX_RED);
+  uint16_t wifiColor = bleActive ? ST77XX_CYAN : (wifiUp ? ST77XX_GREEN : ST77XX_RED);
   tft.fillCircle(10, 128, 3, wifiColor);
   tft.setTextSize(1);
   tft.setTextColor(ST77XX_WHITE);
   tft.setCursor(18, 125);
   tft.print("WiFi: ");
   tft.setTextColor(wifiColor);
-  tft.print(wifiUp ? "Connected" : (bleActive ? "BLE Setup" : "Offline"));
+  tft.print(bleActive ? "BLE Setup" : (wifiUp ? "Connected" : "Offline"));
 
   uint16_t srvColor = serverUp ? ST77XX_GREEN : ST77XX_RED;
   tft.fillCircle(10, 142, 3, srvColor);
@@ -113,8 +135,7 @@ static void renderSensorData() {
 }
 
 void initLcd() {
-  pinMode(Config::BUTTON_PIN, INPUT); 
-  pinMode(Config::TFT_BLK_PIN, OUTPUT);
+  pinMode(Config::BUTTON_PIN, INPUT_PULLUP); 
   backlightWrite(false);
 
   tft.initR(INITR_BLACKTAB);
@@ -125,7 +146,31 @@ void initLcd() {
   lcdActive = false;
 }
 
-void handleLcdLoop(unsigned long now) {
+void wakeLcd(unsigned long now, bool useCached) {
+  lcdTurnedOnAt = now;
+  lastLcdRefresh = now;
+  lastDebounceTime = now;
+  lastButtonState = digitalRead(Config::BUTTON_PIN);
+
+  if (lastButtonState == LOW) {
+    buttonHeld = true;
+    buttonPressStart = now;
+    resetTriggeredDuringHold = false;
+    lastRenderedHoldStage = -1;
+  }
+
+  if (!lcdActive) {
+    lcdActive = true;
+    setDisplaySleep(false);
+  }
+  renderSensorData(useCached);
+}
+
+bool isLcdActive() {
+  return lcdActive;
+}
+
+void handleLcdLoop(unsigned long now, bool useCached) {
   bool reading = digitalRead(Config::BUTTON_PIN);
 
   if (reading != lastButtonState) {
@@ -134,6 +179,10 @@ void handleLcdLoop(unsigned long now) {
       lastButtonState = reading;
 
       if (reading == LOW) {
+        buttonHeld = true;
+        buttonPressStart = now;
+        resetTriggeredDuringHold = false;
+        lastRenderedHoldStage = -1;
         lcdTurnedOnAt = now;
         lastLcdRefresh = now;
 
@@ -141,9 +190,36 @@ void handleLcdLoop(unsigned long now) {
           lcdActive = true;
           setDisplaySleep(false);
         }
-        renderSensorData();
+        renderSensorData(useCached);
+      } else {
+        if (buttonHeld) {
+          buttonHeld = false;
+          lcdTurnedOnAt = now;
+          lastLcdRefresh = now;
+          renderSensorData(useCached);
+        }
       }
     }
+  }
+
+  if (buttonHeld) {
+    lcdTurnedOnAt = now;
+    unsigned long heldMs = now - buttonPressStart;
+
+    if (!resetTriggeredDuringHold && heldMs >= Config::BTN_HOLD_PROVISION_MS) {
+      resetTriggeredDuringHold = true;
+      resetWifiAndStartBle();
+      renderHoldBanner("BLE PROVISIONING!", ST77XX_CYAN, 100);
+      lastRenderedHoldStage = 2;
+    } else if (!resetTriggeredDuringHold && heldMs >= 700) {
+      int pct = constrain((int)(((heldMs - 700UL) * 100UL) / (Config::BTN_HOLD_PROVISION_MS - 700UL)), 0, 100);
+      if (lastRenderedHoldStage != 1 || now - lastHoldBarDraw >= 150) {
+        lastHoldBarDraw = now;
+        lastRenderedHoldStage = 1;
+        renderHoldBanner("Hold: BLE Setup...", ST77XX_CYAN, pct);
+      }
+    }
+    return;
   }
 
   if (lcdActive) {
@@ -153,7 +229,7 @@ void handleLcdLoop(unsigned long now) {
       lcdActive = false;
     } else if (now - lastLcdRefresh >= Config::LCD_REFRESH_INTERVAL_MS) {
       lastLcdRefresh = now;
-      renderSensorData();
+      renderSensorData(useCached);
     }
   }
 }

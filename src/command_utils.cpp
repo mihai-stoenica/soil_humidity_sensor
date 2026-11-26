@@ -123,3 +123,7 @@ void commandLoop() {
       break;
   }
 }
+
+bool isCommandActive() {
+  return activeCmd.phase != CmdPhase::IDLE;
+}

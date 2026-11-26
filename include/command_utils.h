@@ -7,5 +7,6 @@
 
 void handleCommand(const String& json);
 void commandLoop();
+bool isCommandActive();
 
 #endif

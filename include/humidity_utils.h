@@ -18,6 +18,8 @@ struct SensorData {
 
 void initSensors();
 SensorData takeSample();
+SensorData getCachedSensorData();
+bool hasCachedSensorData();
 int getSmoothedHumidity();
 bool shouldSend(SensorData& data);
 void tryUpdateLiveData();
